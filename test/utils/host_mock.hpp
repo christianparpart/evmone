@@ -42,7 +42,7 @@ struct MockedAccount
             balance.bytes[sizeof(balance) - 1 - i] = static_cast<uint8_t>(x >> (8 * i));
     }
 };
-
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 class MockedHost : public evmc::Host
 {
 public:

@@ -10,6 +10,8 @@
 
 #include <cassert>
 
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 namespace evmone
 {
 namespace

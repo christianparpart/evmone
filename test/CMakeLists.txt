@@ -17,9 +17,4 @@ set_target_properties(
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR}
 )
 
-gtest_add_tests(
-    TARGET evmc-vmtester
-    SOURCES ${PROJECT_SOURCE_DIR}/evmc/test/vmtester/tests.cpp
-    EXTRA_ARGS $<TARGET_FILE:evmone>
-    TEST_PREFIX ${PROJECT_NAME}/evmc-vmtester/
-)
+evmc_add_vm_test(NAME ${PROJECT_NAME}/evmc-vmtester TARGET evmone)

@@ -94,7 +94,6 @@ struct execution_state
     evm_stack stack;
     evm_memory memory;
 
-    int64_t memory_cost = 0;
     size_t output_offset = 0;
     size_t output_size = 0;
 

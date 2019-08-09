@@ -54,7 +54,8 @@ code_analysis analyze(
 
     int instr_index = 0;
 
-    for (auto code_pos = code; code_pos < code + code_size; ++code_pos, ++instr_index)
+    const auto code_end = code + code_size;
+    for (auto code_pos = code; code_pos < code_end; ++code_pos, ++instr_index)
     {
         // TODO: Loop in reverse order for easier GAS analysis.
         const auto opcode = *code_pos;
@@ -95,6 +96,12 @@ code_analysis analyze(
 
         switch (opcode)
         {
+        case OP_PUSH1:
+            // TODO: Add microbenchmark. https://godbolt.org/z/Sz1wm6
+            ++code_pos;
+            instr.arg.number64 = code_pos != code_end ? *code_pos : 0;
+            break;
+
         case ANY_SMALL_PUSH:
         {
             const auto push_size = size_t(opcode - OP_PUSH1 + 1);

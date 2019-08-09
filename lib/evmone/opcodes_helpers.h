@@ -4,8 +4,7 @@
 #pragma once
 
 #define ANY_SMALL_PUSH \
-    OP_PUSH1:          \
-    case OP_PUSH2:     \
+    OP_PUSH2:          \
     case OP_PUSH3:     \
     case OP_PUSH4:     \
     case OP_PUSH5:     \

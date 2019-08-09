@@ -72,7 +72,7 @@ TEST(analysis, push)
     const auto analysis = analyze(fake_fn_table, rev, &code[0], code.size());
 
     ASSERT_EQ(analysis.instrs.size(), 4);
-    ASSERT_EQ(analysis.args_storage.size(), 2);
+    ASSERT_EQ(analysis.args_storage.size(), 1);
     EXPECT_EQ(analysis.instrs[0].fn, fake_fn_table[OPX_BEGINBLOCK]);
     EXPECT_EQ(analysis.instrs[1].arg.data, &analysis.args_storage[0][0]);
     EXPECT_EQ(analysis.instrs[2].arg.data, &analysis.args_storage[1][0]);

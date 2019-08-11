@@ -40,8 +40,8 @@ inline uint64_t load64be_fast(const unsigned char* data) noexcept
 }
 
 
-inline uint64_t orig(
-    push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code, const uint8_t* code_end) noexcept
+inline uint64_t orig(push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code,
+    const uint8_t* code_end) noexcept
 {
     const auto code_size = size_t(code_end - code);
     const auto push_size = size_t(opcode - PUSH1 + 1);
@@ -55,8 +55,8 @@ inline uint64_t orig(
     return load64be(data);
 }
 
-inline uint64_t orig_fast_load(
-    push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code, const uint8_t* code_end) noexcept
+inline uint64_t orig_fast_load(push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code,
+    const uint8_t* code_end) noexcept
 {
     const auto code_size = size_t(code_end - code);
     const auto push_size = size_t(opcode - PUSH1 + 1);
@@ -92,10 +92,28 @@ inline uint64_t ptr_noend(
     const auto leading_zeros = 8 - push_size;
     auto d = &data[leading_zeros];
 
-    auto p  = code_pos + 1;
+    auto p = code_pos + 1;
     auto p_end = p + push_size;
     for (; p < p_end; ++d, ++p)
         *d = *p;
+    code_pos += push_size;
+    return load64be(data);
+}
+
+inline uint64_t ptr(
+    push_opcode opcode, const uint8_t*& code_pos, const uint8_t*, const uint8_t* code_end) noexcept
+{
+    const auto push_size = size_t(opcode - PUSH1 + 1);
+    uint8_t data[8]{};
+    const auto leading_zeros = 8 - push_size;
+    auto d = &data[leading_zeros];
+
+
+    auto p = code_pos + 1;
+    auto p_end = p + push_size;
+    if (__builtin_expect(code_end >= p_end, true))
+        for (; p < p_end; ++d, ++p)
+            *d = *p;
     code_pos += push_size;
     return load64be(data);
 }
@@ -146,8 +164,8 @@ inline uint64_t memcpy_ignore_end(
     return load64be_fast(data);
 }
 
-inline uint64_t select(
-    push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code, const uint8_t* code_end) noexcept
+inline uint64_t select(push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code,
+    const uint8_t* code_end) noexcept
 {
     const auto push_size = size_t(opcode - PUSH1 + 1);
     const auto push_begin = code_pos + 1;
@@ -267,6 +285,7 @@ BENCHMARK_TEMPLATE(parse_push_data, orig);
 BENCHMARK_TEMPLATE(parse_push_data, orig_noend);
 BENCHMARK_TEMPLATE(parse_push_data, orig_fast_load);
 BENCHMARK_TEMPLATE(parse_push_data, ptr_noend);
+BENCHMARK_TEMPLATE(parse_push_data, ptr);
 BENCHMARK_TEMPLATE(parse_push_data, memcpy_noend);
 BENCHMARK_TEMPLATE(parse_push_data, memcpy);
 BENCHMARK_TEMPLATE(parse_push_data, select);
@@ -275,6 +294,7 @@ BENCHMARK_TEMPLATE(parse_push_data_switch, orig);
 BENCHMARK_TEMPLATE(parse_push_data_switch, orig_noend);
 BENCHMARK_TEMPLATE(parse_push_data_switch, orig_fast_load);
 BENCHMARK_TEMPLATE(parse_push_data_switch, ptr_noend);
+BENCHMARK_TEMPLATE(parse_push_data_switch, ptr);
 BENCHMARK_TEMPLATE(parse_push_data_switch, memcpy_noend);
 BENCHMARK_TEMPLATE(parse_push_data_switch, memcpy);
 BENCHMARK_TEMPLATE(parse_push_data_switch, select);

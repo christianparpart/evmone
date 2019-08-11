@@ -48,7 +48,7 @@ inline uint64_t orig(push_opcode opcode, const uint8_t*& code_pos, const uint8_t
     uint8_t data[8]{};
 
     const auto leading_zeros = 8 - push_size;
-    const auto i = code_pos - code + 1;
+    const auto i = code_pos - code;
     for (size_t j = 0; j < push_size && (i + j) < code_size; ++j)
         data[leading_zeros + j] = code[i + j];
     code_pos += push_size;
@@ -63,7 +63,7 @@ inline uint64_t orig_fast_load(push_opcode opcode, const uint8_t*& code_pos, con
     uint8_t data[8]{};
 
     const auto leading_zeros = 8 - push_size;
-    const auto i = code_pos - code + 1;
+    const auto i = code_pos - code;
     for (size_t j = 0; j < push_size && (i + j) < code_size; ++j)
         data[leading_zeros + j] = code[i + j];
     code_pos += push_size;
@@ -77,7 +77,7 @@ inline uint64_t orig_noend(
     uint8_t data[8]{};
 
     const auto leading_zeros = 8 - push_size;
-    const auto i = code_pos - code + 1;
+    const auto i = code_pos - code;
     for (size_t j = 0; j < push_size; ++j)
         data[leading_zeros + j] = code[i + j];
     code_pos += push_size;
@@ -92,11 +92,11 @@ inline uint64_t ptr_noend(
     const auto leading_zeros = 8 - push_size;
     auto d = &data[leading_zeros];
 
-    auto p = code_pos + 1;
+    auto p = code_pos;
     auto p_end = p + push_size;
     for (; p < p_end; ++d, ++p)
         *d = *p;
-    code_pos += push_size;
+    code_pos = p;
     return load64be(data);
 }
 
@@ -109,7 +109,7 @@ inline uint64_t ptr(
     auto d = &data[leading_zeros];
 
 
-    auto p = code_pos + 1;
+    auto p = code_pos;
     auto p_end = p + push_size;
     if (__builtin_expect(code_end >= p_end, true))
         for (; p < p_end; ++d, ++p)
@@ -125,7 +125,7 @@ inline uint64_t memcpy_noend(
     uint8_t data[8]{};
     auto d = &data[sizeof(data) - push_size];
 
-    std::memcpy(d, code_pos + 1, push_size);
+    std::memcpy(d, code_pos, push_size);
     code_pos += push_size;
     return load64be_fast(data);
 }
@@ -134,50 +134,14 @@ inline uint64_t memcpy(
     push_opcode opcode, const uint8_t*& code_pos, const uint8_t*, const uint8_t* code_end) noexcept
 {
     const auto push_size = size_t(opcode - PUSH1 + 1);
-    const auto push_begin = code_pos + 1;
-    const auto push_end = push_begin + push_size;
-    uint8_t data[8]{};
-    auto d = &data[sizeof(data) - push_size];
-
-    auto size = push_size;
-    if (__builtin_expect(code_end < push_end, false))
-        size = code_end - push_begin;
-
-    std::memcpy(d, code_pos + 1, size);
-    code_pos += push_size;
-    return load64be_fast(data);
-}
-
-inline uint64_t memcpy_ignore_end(
-    push_opcode opcode, const uint8_t*& code_pos, const uint8_t*, const uint8_t* code_end) noexcept
-{
-    const auto push_size = size_t(opcode - PUSH1 + 1);
-    const auto push_begin = code_pos + 1;
+    const auto push_begin = code_pos;
     const auto push_end = push_begin + push_size;
     uint8_t data[8]{};
     auto d = &data[sizeof(data) - push_size];
 
     if (__builtin_expect(code_end >= push_end, true))
-        std::memcpy(d, code_pos + 1, push_size);
+        std::memcpy(d, code_pos, push_size);
 
-    code_pos += push_size;
-    return load64be_fast(data);
-}
-
-inline uint64_t select(push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code,
-    const uint8_t* code_end) noexcept
-{
-    const auto push_size = size_t(opcode - PUSH1 + 1);
-    const auto push_begin = code_pos + 1;
-    const auto push_end = push_begin + push_size;
-    uint8_t data[8]{};
-    auto d = &data[sizeof(data) - push_size];
-
-    auto size = push_size;
-    if (__builtin_expect(code_end < push_end, false))
-        return orig(opcode, code_pos, code, code_end);
-
-    std::memcpy(d, code_pos + 1, size);
     code_pos += push_size;
     return load64be_fast(data);
 }
@@ -218,9 +182,10 @@ void parse_push_data(benchmark::State& state)
     int64_t num_instructions_processed = 0;
     for (auto _ : state)
     {
-        for (auto pos = code_begin; pos < code_end; ++pos)
+        for (auto pos = code_begin; pos < code_end;)
         {
-            const auto data = F(static_cast<push_opcode>(*pos), pos, code_begin, code_end);
+            auto op = static_cast<push_opcode>(*pos++);
+            const auto data = F(op, pos, code_begin, code_end);
             benchmark::DoNotOptimize(data);
         }
         num_instructions_processed += num_instructions;
@@ -240,10 +205,10 @@ void parse_push_data_switch(benchmark::State& state)
     int64_t num_instructions_processed = 0;
     for (auto _ : state)
     {
-        for (auto pos = code_begin; pos < code_end; ++pos)
+        for (auto pos = code_begin; pos < code_end;)
         {
             uint64_t data;
-            const auto op = static_cast<push_opcode>(*pos);
+            const auto op = static_cast<push_opcode>(*pos++);
             switch (op)
             {
             case PUSH1:
@@ -288,8 +253,6 @@ BENCHMARK_TEMPLATE(parse_push_data, ptr_noend);
 BENCHMARK_TEMPLATE(parse_push_data, ptr);
 BENCHMARK_TEMPLATE(parse_push_data, memcpy_noend);
 BENCHMARK_TEMPLATE(parse_push_data, memcpy);
-BENCHMARK_TEMPLATE(parse_push_data, select);
-BENCHMARK_TEMPLATE(parse_push_data, memcpy_ignore_end);
 BENCHMARK_TEMPLATE(parse_push_data_switch, orig);
 BENCHMARK_TEMPLATE(parse_push_data_switch, orig_noend);
 BENCHMARK_TEMPLATE(parse_push_data_switch, orig_fast_load);
@@ -297,6 +260,4 @@ BENCHMARK_TEMPLATE(parse_push_data_switch, ptr_noend);
 BENCHMARK_TEMPLATE(parse_push_data_switch, ptr);
 BENCHMARK_TEMPLATE(parse_push_data_switch, memcpy_noend);
 BENCHMARK_TEMPLATE(parse_push_data_switch, memcpy);
-BENCHMARK_TEMPLATE(parse_push_data_switch, select);
-BENCHMARK_TEMPLATE(parse_push_data_switch, memcpy_ignore_end);
 }  // namespace

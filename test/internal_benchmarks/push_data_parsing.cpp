@@ -55,21 +55,6 @@ inline uint64_t orig(push_opcode opcode, const uint8_t*& code_pos, const uint8_t
     return load64be(data);
 }
 
-inline uint64_t orig_fast_load(push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code,
-    const uint8_t* code_end) noexcept
-{
-    const auto code_size = size_t(code_end - code);
-    const auto push_size = size_t(opcode - PUSH1 + 1);
-    uint8_t data[8]{};
-
-    const auto leading_zeros = 8 - push_size;
-    const auto i = code_pos - code;
-    for (size_t j = 0; j < push_size && (i + j) < code_size; ++j)
-        data[leading_zeros + j] = code[i + j];
-    code_pos += push_size;
-    return load64be_fast(data);
-}
-
 inline uint64_t orig_noend(
     push_opcode opcode, const uint8_t*& code_pos, const uint8_t* code, const uint8_t*) noexcept
 {
@@ -101,33 +86,50 @@ inline uint64_t ptr_noend(
 }
 
 inline uint64_t ptr(
-    push_opcode opcode, const uint8_t*& code_pos, const uint8_t*, const uint8_t* code_end) noexcept
+    push_opcode opcode, const uint8_t*& pos, const uint8_t*, const uint8_t* code_end) noexcept
 {
     const auto push_size = size_t(opcode - PUSH1 + 1);
+
     uint8_t data[8]{};
-    const auto leading_zeros = 8 - push_size;
-    auto d = &data[leading_zeros];
+    auto d = &data[8 - push_size];
 
-
-    auto p = code_pos;
+    auto p = pos;
     auto p_end = p + push_size;
-    if (__builtin_expect(code_end >= p_end, true))
+
+
+    if (__builtin_expect(code_end < p_end, false))
+        pos = code_end;
+    else
         for (; p < p_end; ++d, ++p)
             *d = *p;
-    code_pos += push_size;
-    return load64be(data);
+
+    pos = p_end;
+
+    return load64be_fast(data);
 }
 
-inline uint64_t memcpy_noend(
-    push_opcode opcode, const uint8_t*& code_pos, const uint8_t*, const uint8_t*) noexcept
+inline uint64_t ptr2(
+    push_opcode opcode, const uint8_t*& pos, const uint8_t*, const uint8_t* code_end) noexcept
 {
     const auto push_size = size_t(opcode - PUSH1 + 1);
-    uint8_t data[8]{};
-    auto d = &data[sizeof(data) - push_size];
 
-    std::memcpy(d, code_pos, push_size);
-    code_pos += push_size;
-    return load64be_fast(data);
+    uint64_t value = 0;
+    uint8_t* data = (uint8_t*)&value;
+    auto d = &data[8 - push_size];
+
+    auto p = pos;
+    auto p_end = p + push_size;
+
+
+    if (__builtin_expect(code_end < p_end, false))
+        pos = code_end;
+    else
+        for (; p < p_end; ++d, ++p)
+            *d = *p;
+
+    pos = p_end;
+
+    return __builtin_bswap64(value);
 }
 
 inline uint64_t memcpy(
@@ -136,14 +138,21 @@ inline uint64_t memcpy(
     const auto push_size = size_t(opcode - PUSH1 + 1);
     const auto push_begin = code_pos;
     const auto push_end = push_begin + push_size;
-    uint8_t data[8]{};
+
+    uint64_t value = 0;
+    uint8_t* data = (uint8_t*)&value;
     auto d = &data[sizeof(data) - push_size];
 
-    if (__builtin_expect(code_end >= push_end, true))
-        std::memcpy(d, code_pos, push_size);
+    if (__builtin_expect(code_end < push_end, false))
+    {
+        code_pos = code_end;
+        return value;
+    }
+
+    std::memcpy(d, code_pos, push_size);
 
     code_pos += push_size;
-    return load64be_fast(data);
+    return __builtin_bswap64(value);
 }
 
 std::vector<uint8_t> gen_push_code_random(size_t num_instructions)
@@ -248,16 +257,14 @@ void parse_push_data_switch(benchmark::State& state)
 
 BENCHMARK_TEMPLATE(parse_push_data, orig);
 BENCHMARK_TEMPLATE(parse_push_data, orig_noend);
-BENCHMARK_TEMPLATE(parse_push_data, orig_fast_load);
 BENCHMARK_TEMPLATE(parse_push_data, ptr_noend);
 BENCHMARK_TEMPLATE(parse_push_data, ptr);
-BENCHMARK_TEMPLATE(parse_push_data, memcpy_noend);
+BENCHMARK_TEMPLATE(parse_push_data, ptr2);
 BENCHMARK_TEMPLATE(parse_push_data, memcpy);
 BENCHMARK_TEMPLATE(parse_push_data_switch, orig);
 BENCHMARK_TEMPLATE(parse_push_data_switch, orig_noend);
-BENCHMARK_TEMPLATE(parse_push_data_switch, orig_fast_load);
 BENCHMARK_TEMPLATE(parse_push_data_switch, ptr_noend);
 BENCHMARK_TEMPLATE(parse_push_data_switch, ptr);
-BENCHMARK_TEMPLATE(parse_push_data_switch, memcpy_noend);
+BENCHMARK_TEMPLATE(parse_push_data_switch, ptr2);
 BENCHMARK_TEMPLATE(parse_push_data_switch, memcpy);
 }  // namespace
